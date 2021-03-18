@@ -21,11 +21,16 @@ using FundooNotesManagerLayer.Manager;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using FundooNotesRepositoryLayer.MSMQ_Services;
 
 namespace FundooNotes
 {
     public class Startup
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="configuration"></param>
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -36,15 +41,58 @@ namespace FundooNotes
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddDbContextPool<UserContext>(opts => opts.UseSqlServer(Configuration.GetConnectionString("MyUserDatabase")));
+            services.AddDbContext<UserContext>(opts => opts.UseMySql(Configuration.GetConnectionString("MyUserDatabase")));
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.AddTransient<IUserManager, UserManager>();
             services.AddTransient<IUserRepo, UserRepo>();
+            services.AddTransient<INoteManager, NoteManager>();
+            services.AddTransient<INoteRepos, NoteRepo>();
+            services.AddTransient<ILabelManager, LabelManager>();
+            services.AddTransient<ILabelRepo, LabelRepo>();
+            services.AddTransient<ICollaboratorManager, CollaboratorManager>();
+            services.AddTransient<ICollaboratorRepo, CollaboratorRepo>();
+            services.AddScoped<IMSMQService, MSMQService>();
+            services.AddDistributedRedisCache(option =>
+            {
+                option.Configuration = "localhost:6379";
+                option.InstanceName = "FundooNotes";
+            });
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new Info { Title = "Fundoo App", Version = "v1", Description = "Fundoo Application" });
+                c.AddSecurityDefinition("Bearer", new ApiKeyScheme
+                {
+                    Description = "JWT Authorization header using the Bearer scheme. \r\n\r\n Enter 'Bearer' [space] and then your token in the text input below.\r\n\r\nExample: \"Bearer 12345abcdef\"",
+                    Name = "Authorization",
+                    In = "header",
+                    Type = "apiKey"
+                });
+
+                c.AddSecurityRequirement(new Dictionary<string, IEnumerable<string>>
+                {
+                { "Bearer", new string[] {} }
+              });
             });
-            
+            var key = Encoding.UTF8.GetBytes(Configuration["Key"]);
+            services.AddAuthentication(x =>
+            {
+                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                x.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(x =>
+            {
+                x.RequireHttpsMetadata = false;
+                x.SaveToken = false;
+                x.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    //ClockSkew = TimeSpan.Zero
+                };
+            });
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

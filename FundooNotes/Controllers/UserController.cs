@@ -2,8 +2,10 @@
 using FundooNotesModelLayer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
@@ -19,13 +21,16 @@ namespace FundooNotes.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserManager userManager;
-
         private readonly IConfiguration configuration;
+        private readonly IDistributedCache cache;
+        private readonly string cacheKey;
 
-        public UserController(IUserManager userManager, IConfiguration configuration)
+        public UserController(IUserManager userManager, IConfiguration configuration, IDistributedCache cache)
         {
             this.userManager = userManager;
             this.configuration = configuration;
+            this.cache = cache;
+            this.cacheKey = "User";
         }
         [HttpPost]
         public ActionResult AddUser(UserRegistration user)
@@ -48,7 +53,6 @@ namespace FundooNotes.Controllers
         }
        
         [HttpPut]
-        [Route("resetPassword")]
         public ActionResult ResetPassword(ResetUserPassword user)
         {
             try
@@ -72,8 +76,7 @@ namespace FundooNotes.Controllers
             }
         }
         [HttpGet]
-        [Route("{email}")]
-
+        [Route("ForgotPassword/{email}")]
         public IActionResult ForgotPassword(string email)
         {
             try
@@ -101,7 +104,13 @@ namespace FundooNotes.Controllers
                 var result = this.userManager.GetAllUser();
                 if (result != null)
                 {
-                    return this.Ok(new { Status = true, Message = "User Get Successfully", Data = result });
+                    this.cache.SetString(this.cacheKey, JsonConvert.SerializeObject(result));
+                    
+                }
+                if(this.cache.GetString(cacheKey)!=null)
+                {
+                    var data = JsonConvert.DeserializeObject<List<UserRegistration>>(this.cache.GetString(cacheKey));
+                    return this.Ok(new { Status = true, Message = "User Get Successfully", Data = data });
                 }
                 return this.BadRequest(new { Status = false, Message = "User Get UnSuccessfully" });
 
@@ -121,8 +130,9 @@ namespace FundooNotes.Controllers
                 var result = this.userManager.Login(login);
                 if (result!=null)
                 {
+                   
                     var token = GenrateJWTToken(result.Email,result.UserId);
-                    return this.Ok(new { Status = true, Message = "User Varified Successfully", Data = token });
+                    return this.Ok(new { Status = true, Message = "User Varified Successfully", Data = token});
                 }
                 return this.NotFound(new { Status = false, Message = "User Verified UnSuccessfully" });
 

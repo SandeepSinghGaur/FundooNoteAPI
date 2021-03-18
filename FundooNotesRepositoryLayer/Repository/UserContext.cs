@@ -13,5 +13,8 @@ namespace FundooNotesRepositoryLayer.Repository
         {
         }
         public DbSet<UserRegistration> Users { get; set; }
+        public DbSet<Note> Notes { get; set; }
+        public DbSet<Label> Labels { get; set; }
+        public DbSet<Collaborator> Collaborators { get; set; }
     }
 }

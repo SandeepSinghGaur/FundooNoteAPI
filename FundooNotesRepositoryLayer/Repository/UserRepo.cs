@@ -1,5 +1,6 @@
 ﻿using FundooNotesModelLayer;
 using FundooNotesRepositoryLayer.IRepository;
+using FundooNotesRepositoryLayer.MSMQ_Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using System;
@@ -14,12 +15,12 @@ namespace FundooNotesRepositoryLayer.Repository
 {
     public class UserRepo : IUserRepo
     {
-        private readonly IConfiguration configuration;
         private readonly UserContext userDbContext;
-        public UserRepo(UserContext userDbContext,IConfiguration configuration)
+        private readonly IMSMQService msmq;
+        public UserRepo(UserContext userDbContext,IMSMQService msmq)
         {
-            this.configuration = configuration;
-            this.userDbContext = userDbContext;
+            this.msmq = msmq;
+            this.userDbContext = userDbContext;   
         }
       
         public string PasswordEncryption(string password)
@@ -90,27 +91,30 @@ namespace FundooNotesRepositoryLayer.Repository
         }
         public string ForgetPassword(ForgetPassword forget)
         {
-            string subject = "Reset Password link is provided below click on the link";
-            string body="link will be provided from frontend";
+            //string subject = "Reset Password link is provided below click on the link";
+            //string body="Hello Dear user link will be provided from frontend";
             var result = this.userDbContext.Users.Where<UserRegistration>(user => user.Email == forget.Email).FirstOrDefault();
             if (result != null)
             {
                 string decode = Decryptdata(result.Password);
-                using (MailMessage mailMessage = new MailMessage("sandeepgaurdec13@gmail.com", forget.Email))
-                {
-                    mailMessage.Subject = subject;
-                    mailMessage.Body = body;
-                    mailMessage.IsBodyHtml = true;
-                    SmtpClient smtp = new SmtpClient();
-                    smtp.Host = "smtp.gmail.com";
-                    smtp.EnableSsl = true;
-                    NetworkCredential NetworkCred = new NetworkCredential("sandeepgaurdec13@gmail.com", "sANDEEP123@");
-                    smtp.UseDefaultCredentials = true;
-                    smtp.Credentials = NetworkCred;
-                    smtp.Port = 587;
-                    smtp.Send(mailMessage);
-                    return "Success";
-                }
+                //using (MailMessage mailMessage = new MailMessage("sandeepgaurdec13@gmail.com", forget.Email))
+                //{
+                //    mailMessage.Subject = subject;
+                //    mailMessage.Body = body;
+                //    mailMessage.IsBodyHtml = true;
+                //    SmtpClient smtp = new SmtpClient();
+                //    smtp.Host = "smtp.gmail.com";
+                //    smtp.EnableSsl = true;
+                //    NetworkCredential NetworkCred = new NetworkCredential("sandeepgaurdec13@gmail.com", "sANDEEP123@");
+                //    smtp.UseDefaultCredentials = true;
+                //    smtp.Credentials = NetworkCred;
+                //    smtp.Port = 587;
+                //    smtp.Send(mailMessage);
+                //    return "Success";
+                //}
+                this.msmq.AddToQueue(forget.Email);
+                return "Success";
+
             }
             return "Error";
         }
