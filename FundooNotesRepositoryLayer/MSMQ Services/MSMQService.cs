@@ -10,9 +10,14 @@ namespace FundooNotesRepositoryLayer.MSMQ_Services
 {
     public class MSMQService :IMSMQService
     {
+        /// <summary>
+        /// Created a instance of MessageQueue class
+        /// </summary>
         private readonly MessageQueue messageQueue = new MessageQueue();
         string email;
-
+        /// <summary>
+        /// Create the Queue if not exists
+        /// </summary>
         public MSMQService()
         {
             this.messageQueue.Path = @".\private$\Fundoo";
@@ -32,6 +37,7 @@ namespace FundooNotesRepositoryLayer.MSMQ_Services
         public void AddToQueue(string email)
         {
             this.email = email;
+            //Set Formatter to serialize the object,I’m using XML //serialization
             this.messageQueue.Formatter = new XmlMessageFormatter(new Type[] { typeof(string) });
 
             this.messageQueue.ReceiveCompleted += this.ReceiveFromQueue;

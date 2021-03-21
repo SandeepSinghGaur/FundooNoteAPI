@@ -22,15 +22,10 @@ namespace FundooNotes.Controllers
     {
         private readonly IUserManager userManager;
         private readonly IConfiguration configuration;
-        private readonly IDistributedCache cache;
-        private readonly string cacheKey;
-
-        public UserController(IUserManager userManager, IConfiguration configuration, IDistributedCache cache)
+        public UserController(IUserManager userManager, IConfiguration configuration)
         {
             this.userManager = userManager;
             this.configuration = configuration;
-            this.cache = cache;
-            this.cacheKey = "User";
         }
         [HttpPost]
         public ActionResult AddUser(UserRegistration user)
@@ -102,15 +97,10 @@ namespace FundooNotes.Controllers
             try
             {
                 var result = this.userManager.GetAllUser();
+
                 if (result != null)
                 {
-                    this.cache.SetString(this.cacheKey, JsonConvert.SerializeObject(result));
-                    
-                }
-                if(this.cache.GetString(cacheKey)!=null)
-                {
-                    var data = JsonConvert.DeserializeObject<List<UserRegistration>>(this.cache.GetString(cacheKey));
-                    return this.Ok(new { Status = true, Message = "User Get Successfully", Data = data });
+                    return this.Ok(new { Status = true, Message = "User Get Successfully", Data = result });
                 }
                 return this.BadRequest(new { Status = false, Message = "User Get UnSuccessfully" });
 
@@ -128,14 +118,12 @@ namespace FundooNotes.Controllers
             try
             {
                 var result = this.userManager.Login(login);
-                if (result!=null)
+                if (result != null)
                 {
-                   
-                    var token = GenrateJWTToken(result.Email,result.UserId);
-                    return this.Ok(new { Status = true, Message = "User Varified Successfully", Data = token});
+                    var token = GenrateJWTToken(result.Email, result.UserId);
+                    return this.Ok(new { Status = true, Message = "User Varified Successfully", Data = token });
                 }
                 return this.NotFound(new { Status = false, Message = "User Verified UnSuccessfully" });
-
             }
             catch (Exception e)
             {
@@ -145,6 +133,7 @@ namespace FundooNotes.Controllers
         }
         private string GenrateJWTToken(string Email, long userId)
         {
+            /// key getting from startup class
             var secretkey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Key"]));
             var signinCredentials = new SigningCredentials(secretkey, SecurityAlgorithms.HmacSha256);
             var claims = new List<Claim>

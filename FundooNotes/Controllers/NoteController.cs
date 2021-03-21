@@ -3,7 +3,9 @@ using FundooNotesModelLayer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,9 +19,7 @@ namespace FundooNotes.Controllers
     public class NoteController : Controller
     {
         private readonly INoteManager noteManager;
-
         private readonly IConfiguration configuration;
-
         public NoteController(INoteManager noteManager, IConfiguration configuration)
         {
             this.configuration = configuration;
@@ -56,7 +56,7 @@ namespace FundooNotes.Controllers
                 var result = this.noteManager.GetNote(userId, noteId);
                 if (result != null)
                 {
-                    return this.Ok(new { Status = true, Message = "Note Get Successfully", Data = result });
+                   return this.Ok(new { Status = true, Message = "Note Get Successfully", Data = result });
                 }
                 return this.BadRequest(new { Status = false, Message = "Note Get UnSuccessFully" });
             }
@@ -74,9 +74,9 @@ namespace FundooNotes.Controllers
                 var result = this.noteManager.PinNote(noteId);
                 if (result != 0)
                 {
-                    return this.Ok(new { Status = true, Message = "Note Pin Successfully", Data = result });
+                   return this.Ok(new { Status = true, Message = "Note Pin Successfully", Data = result });
                 }
-                return this.BadRequest(new { Status = false, Message = "Note Get SuccessFully" });
+                return this.BadRequest(new { Status = false, Message = "Note Pin UnSuccessFully" });
             }
             catch (Exception e)
             {
@@ -94,7 +94,7 @@ namespace FundooNotes.Controllers
                 {
                     return this.Ok(new { Status = true, Message = "Archive Successfully", Data = result });
                 }
-                return this.BadRequest(new { Status = false, Message = "Archive SuccessFully" });
+                return this.BadRequest(new { Status = false, Message = "Archive UnuccessFully" });
             }
             catch (Exception e)
             {

@@ -3,7 +3,9 @@ using CloudinaryDotNet.Actions;
 using FundooNotesModelLayer;
 using FundooNotesRepositoryLayer.IRepository;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,16 +16,24 @@ namespace FundooNotesRepositoryLayer.Repository
     public class NoteRepo : INoteRepos
     {
         private readonly UserContext userDbContext;
-        public NoteRepo(UserContext userDbContext)
+        private readonly IConfiguration configuration;
+        private readonly IDistributedCache cache;
+        private readonly string cacheKey;
+        public NoteRepo(UserContext userDbContext, IConfiguration configuration, IDistributedCache cache)
         {
             this.userDbContext = userDbContext;
+            this.configuration = configuration;
+            this.cache = cache;
+            this.cacheKey = "Note";
         }
         public Note AddNote( Note note)
         {
             this.userDbContext.Notes.Add(note);
             var result = this.userDbContext.SaveChanges();
             if (result != 0)
+            {
                 return note;
+            }
             return null;
         }
 
@@ -56,8 +66,21 @@ namespace FundooNotesRepositoryLayer.Repository
 
         public Note GetNote(int userId, int noteId)
         {
-            //this.userDbContext.Notes.Where(user => user.UserId == userId && user.IsTrash == false && user.IsArchive == false);
+            var dataFromCache = cache.GetString(cacheKey);
+            var data = JsonConvert.DeserializeObject<List<Note>>(dataFromCache);
+            if (data != null)
+            {
+                foreach (var kvp in data)
+                {
+                    if (kvp.NoteId == noteId && kvp.UserId==userId)
+                    {
+                        return kvp;
+                    }
+
+                }
+            }
             return userDbContext.Notes.FirstOrDefault(Note => Note.NoteId == noteId && Note.UserId == userId);
+           
         }
 
         public Note UpdateNote(int UserId, Note NewNote)
@@ -112,7 +135,22 @@ namespace FundooNotesRepositoryLayer.Repository
         }
         public IEnumerable<Note> GetAllNotes(int userId)
         {
-            return this.userDbContext.Notes.Where(user => user.UserId == userId && user.IsArchive == false && user.IsTrash == false).ToList<Note>();
+            if (this.cache.GetString(cacheKey) != null)
+            {
+                var data = JsonConvert.DeserializeObject<List<Note>>(this.cache.GetString(cacheKey));
+                return data;
+            }
+            else
+            {
+                var result = this.userDbContext.Notes.Where(user => user.UserId == userId && user.IsArchive == false && user.IsTrash == false).ToList<Note>();
+                if (result != null)
+                {
+                    this.cache.SetString(this.cacheKey, JsonConvert.SerializeObject(result));
+
+                }
+                return result;
+            }
+            
         }
         public string Image(IFormFile file, int id)
         {

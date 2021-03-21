@@ -28,7 +28,7 @@ namespace FundooNotes
     public class Startup
     {
         /// <summary>
-        /// 
+        ///  read configuration settings in the constructor for Startup class.
         /// </summary>
         /// <param name="configuration"></param>
         public Startup(IConfiguration configuration)

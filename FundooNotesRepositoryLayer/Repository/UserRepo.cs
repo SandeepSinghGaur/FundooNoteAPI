@@ -2,7 +2,9 @@
 using FundooNotesRepositoryLayer.IRepository;
 using FundooNotesRepositoryLayer.MSMQ_Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,10 +19,16 @@ namespace FundooNotesRepositoryLayer.Repository
     {
         private readonly UserContext userDbContext;
         private readonly IMSMQService msmq;
-        public UserRepo(UserContext userDbContext,IMSMQService msmq)
+        private readonly IConfiguration configuration;
+        private readonly IDistributedCache cache;
+        private readonly string cacheKey;
+        public UserRepo(UserContext userDbContext,IMSMQService msmq, IConfiguration configuration, IDistributedCache cache)
         {
             this.msmq = msmq;
-            this.userDbContext = userDbContext;   
+            this.userDbContext = userDbContext;
+            this.configuration = configuration;
+            this.cache = cache;
+            this.cacheKey = "User";
         }
       
         public string PasswordEncryption(string password)
@@ -57,12 +65,26 @@ namespace FundooNotesRepositoryLayer.Repository
             this.userDbContext.Users.Add(objUser);
             var result = this.userDbContext.SaveChanges();
             if (result != 0)
+            { 
                 return objUser;
+            }
             return null ;
         }
         public UserRegistration Login(UserLogin login)
         {
-            
+            var dataFromCache = cache.GetString(cacheKey);
+            var data = JsonConvert.DeserializeObject<List<UserRegistration>>(dataFromCache);
+            if (data != null)
+            {
+                foreach (var kvp in data)
+                {
+                    string decryptPassword = Decryptdata(kvp.Password);
+                    if (kvp.Email == login.Email && decryptPassword==login.Password)
+                    {
+                        return kvp;
+                    }
+                }
+            }
             var result = this.userDbContext.Users.Where<UserRegistration>(details => details.Email == login.Email).FirstOrDefault();
             if (result != null)
             {
@@ -72,6 +94,7 @@ namespace FundooNotesRepositoryLayer.Repository
             }
             return null;
         }
+
         public UserRegistration ResetPassword(ResetUserPassword reset)
         {
             
@@ -91,27 +114,10 @@ namespace FundooNotesRepositoryLayer.Repository
         }
         public string ForgetPassword(ForgetPassword forget)
         {
-            //string subject = "Reset Password link is provided below click on the link";
-            //string body="Hello Dear user link will be provided from frontend";
             var result = this.userDbContext.Users.Where<UserRegistration>(user => user.Email == forget.Email).FirstOrDefault();
             if (result != null)
             {
                 string decode = Decryptdata(result.Password);
-                //using (MailMessage mailMessage = new MailMessage("sandeepgaurdec13@gmail.com", forget.Email))
-                //{
-                //    mailMessage.Subject = subject;
-                //    mailMessage.Body = body;
-                //    mailMessage.IsBodyHtml = true;
-                //    SmtpClient smtp = new SmtpClient();
-                //    smtp.Host = "smtp.gmail.com";
-                //    smtp.EnableSsl = true;
-                //    NetworkCredential NetworkCred = new NetworkCredential("sandeepgaurdec13@gmail.com", "sANDEEP123@");
-                //    smtp.UseDefaultCredentials = true;
-                //    smtp.Credentials = NetworkCred;
-                //    smtp.Port = 587;
-                //    smtp.Send(mailMessage);
-                //    return "Success";
-                //}
                 this.msmq.AddToQueue(forget.Email);
                 return "Success";
 
@@ -120,8 +126,21 @@ namespace FundooNotesRepositoryLayer.Repository
         }
         public IEnumerable<UserRegistration> GetAllUser()
         {
-            var result = this.userDbContext.Users.ToList<UserRegistration>();
-            return result;
+            if (this.cache.GetString(cacheKey) != null)
+            {
+                var data = JsonConvert.DeserializeObject<List<UserRegistration>>(this.cache.GetString(cacheKey));
+                return data;
+            }
+            else
+            {
+                var result = this.userDbContext.Users.ToList<UserRegistration>();
+                if (result != null)
+                {
+                    this.cache.SetString(this.cacheKey, JsonConvert.SerializeObject(result));
+
+                }
+                return result;
+            }
         }
         
     }

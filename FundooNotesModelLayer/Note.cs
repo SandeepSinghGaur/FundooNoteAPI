@@ -10,6 +10,7 @@ namespace FundooNotesModelLayer
     {
 
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int NoteId { get; set; }
         public string Title { get; set; }
         public bool IsPin { get; set; } = false;
